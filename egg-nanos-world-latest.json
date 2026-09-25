@@ -6,7 +6,7 @@
     },
     "exported_at": "2026-09-25T15:35:41.683496+00:00",
     "name": "nanos world - Latest",
-    "author": "Yuketsu (https://github.com/YuketsuSh)",
+    "author": "contact@velyorix.com",
     "description": "Open-source Pelican egg for nanos world Dedicated Server. CLI arguments validated against nanos world a1.156.0 documentation; SteamCMD public/bleeding-edge install, safe startup wrapper and game/query allocations.",
     "features": [
         "steam_disk_space"
