@@ -1,0 +1,365 @@
+{
+    "_comment": "Copyright (c) 2026 Yuketsu. Licensed under the MIT License.",
+    "meta": {
+        "version": "PTDL_v2",
+        "update_url": null
+    },
+    "exported_at": "2026-09-25T15:19:21.488751+00:00",
+    "name": "nanos world - Latest",
+    "author": "Yuketsu (https://github.com/YuketsuSh)",
+    "description": "Open-source Pelican egg for the nanos world Dedicated Server. SteamCMD installation, public/bleeding-edge branches, safe startup wrapper, game/query allocations and configurable server/network settings.",
+    "features": [
+        "steam_disk_space"
+    ],
+    "docker_images": {
+        "SteamCMD Debian": "ghcr.io/ptero-eggs/steamcmd:debian",
+        "SteamCMD Ubuntu 24.04": "ghcr.io/ptero-eggs/steamcmd:ubuntu_24.04"
+    },
+    "file_denylist": [],
+    "startup": "bash ./pelican-start.sh",
+    "config": {
+        "files": "{}",
+        "startup": "{\n    \"done\": \"Server started\"\n}",
+        "logs": "{}",
+        "stop": "stop"
+    },
+    "scripts": {
+        "installation": {
+            "script": "#!/bin/bash\nset -euo pipefail\n\nAPP_ID=\"${SRCDS_APPID:-1936830}\"\nBRANCH=\"${SRCDS_BETAID:-public}\"\nINSTALL_DIR=\"/mnt/server\"\nSTEAMCMD_DIR=\"${INSTALL_DIR}/steamcmd\"\n\necho \"==================================================\"\necho \" nanos world Dedicated Server - Pelican\"\necho \" Maintainer: Yuketsu (YuketsuSh)\"\necho \" Steam App ID: ${APP_ID}\"\necho \" Branch: ${BRANCH}\"\necho \"==================================================\"\n\nmkdir -p \"${INSTALL_DIR}\" \"${STEAMCMD_DIR}\"\ncd /tmp\n\necho \"[1/4] Downloading SteamCMD...\"\ncurl -fsSL \\\n  \"https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz\" \\\n  -o steamcmd_linux.tar.gz\ntar -xzf steamcmd_linux.tar.gz -C \"${STEAMCMD_DIR}\"\n\nexport HOME=\"${INSTALL_DIR}\"\ncd \"${STEAMCMD_DIR}\"\n\necho \"[2/4] Installing/updating nanos world...\"\n./steamcmd.sh \\\n    +force_install_dir \"${INSTALL_DIR}\" \\\n    +login anonymous \\\n    +app_update \"${APP_ID}\" -beta \"${BRANCH}\" validate \\\n    +quit\n\necho \"[3/4] Preparing Steam runtime...\"\nmkdir -p \"${INSTALL_DIR}/.steam/sdk32\" \"${INSTALL_DIR}/.steam/sdk64\"\n\nif [[ -f \"${STEAMCMD_DIR}/linux32/steamclient.so\" ]]; then\n    cp -f \"${STEAMCMD_DIR}/linux32/steamclient.so\" \\\n        \"${INSTALL_DIR}/.steam/sdk32/steamclient.so\"\nfi\n\nif [[ -f \"${STEAMCMD_DIR}/linux64/steamclient.so\" ]]; then\n    cp -f \"${STEAMCMD_DIR}/linux64/steamclient.so\" \\\n        \"${INSTALL_DIR}/.steam/sdk64/steamclient.so\"\nfi\n\nchmod +x \"${INSTALL_DIR}/NanosWorldServer.sh\" 2>/dev/null || true\nchmod +x \"${INSTALL_DIR}/NanosWorldServer\" 2>/dev/null || true\nchmod +x \"${INSTALL_DIR}/NanosWorldServerTracy\" 2>/dev/null || true\n\necho \"[4/4] Writing Pelican startup wrapper...\"\n\ncat > \"${INSTALL_DIR}/pelican-start.sh\" <<'EOF'\n#!/bin/bash\nset -euo pipefail\n\ncd /home/container\n\nif [[ ! -f \"./NanosWorldServer.sh\" ]]; then\n    echo \"[FATAL] ./NanosWorldServer.sh was not found.\"\n    echo \"[FATAL] Reinstall the server from Pelican.\"\n    exit 1\nfi\n\nchmod +x ./NanosWorldServer.sh 2>/dev/null || true\n\nif [[ \"${QUERY_PORT}\" == \"${SERVER_PORT}\" ]]; then\n    echo \"[FATAL] QUERY_PORT (${QUERY_PORT}) must differ from SERVER_PORT (${SERVER_PORT}).\"\n    exit 1\nfi\n\nif (( MAX_FILE_TRANSFER_RATE > MAX_SEND_RATE )); then\n    echo \"[WARN] MAX_FILE_TRANSFER_RATE is greater than MAX_SEND_RATE.\"\n    echo \"[WARN] nanos world will clamp it; using MAX_SEND_RATE=${MAX_SEND_RATE} instead.\"\n    MAX_FILE_TRANSFER_RATE=\"${MAX_SEND_RATE}\"\nfi\n\nargs=(\n    --name \"${SERVER_NAME}\"\n    --description \"${SERVER_DESCRIPTION}\"\n    --language \"${SERVER_LANGUAGE}\"\n    --ip \"0.0.0.0\"\n    --port \"${SERVER_PORT}\"\n    --query_port \"${QUERY_PORT}\"\n    --announce \"${ANNOUNCE}\"\n    --dedicated_server \"${DEDICATED_SERVER}\"\n    --steam_app \"${STEAM_APP}\"\n    --map \"${SERVER_MAP}\"\n    --max_players \"${MAX_PLAYERS}\"\n    --async_log \"${ASYNC_LOG}\"\n    --log_level \"${LOG_LEVEL}\"\n    --compression \"${COMPRESSION}\"\n    --max_tick_rate \"${MAX_TICK_RATE}\"\n    --max_sync_rate \"${MAX_SYNC_RATE}\"\n    --max_send_rate \"${MAX_SEND_RATE}\"\n    --max_file_transfer_rate \"${MAX_FILE_TRANSFER_RATE}\"\n    --distance_optimization \"${DISTANCE_OPTIMIZATION}\"\n    --thread_pool_count \"${THREAD_POOL_COUNT}\"\n)\n\n[[ -n \"${SERVER_PASSWORD:-}\" ]] && args+=(--password \"${SERVER_PASSWORD}\")\n[[ -n \"${SERVER_TOKEN:-}\" ]] && args+=(--token \"${SERVER_TOKEN}\")\n[[ -n \"${GAME_MODE:-}\" ]] && args+=(--game_mode \"${GAME_MODE}\")\n[[ -n \"${PACKAGES:-}\" ]] && args+=(--packages \"${PACKAGES}\")\n[[ -n \"${ASSETS:-}\" ]] && args+=(--assets \"${ASSETS}\")\n[[ -n \"${LOADING_SCREEN:-}\" ]] && args+=(--loading_screen \"${LOADING_SCREEN}\")\n[[ -n \"${SERVER_LOGO:-}\" ]] && args+=(--logo \"${SERVER_LOGO}\")\n[[ -n \"${CUSTOM_SETTINGS:-}\" ]] && args+=(--custom_settings \"${CUSTOM_SETTINGS}\")\n\n[[ \"${AUTO_DOWNLOAD:-1}\" == \"1\" ]] && args+=(--auto_download)\n[[ \"${PROFILING:-0}\" == \"1\" ]] && args+=(--profiling)\n[[ \"${LOG_SHOW_THREAD:-0}\" == \"1\" ]] && args+=(--log_show_thread)\n[[ \"${USE_VAULT_ASSETS_LEAN:-0}\" == \"1\" ]] && args+=(--use_vault_assets_lean)\n[[ \"${ENABLE_UNSAFE_LIBS:-0}\" == \"1\" ]] && args+=(--enable_unsafe_libs)\n\necho \"==================================================\"\necho \" nanos world Dedicated Server\"\necho \" Maintained by Yuketsu / YuketsuSh\"\necho \" Game/HTTP : 0.0.0.0:${SERVER_PORT} TCP + UDP\"\necho \" Query     : 0.0.0.0:${QUERY_PORT} UDP\"\necho \" Steam App : ${STEAM_APP}\"\necho \" Map       : ${SERVER_MAP}\"\necho \" Players   : ${MAX_PLAYERS}\"\necho \"==================================================\"\n\nexec ./NanosWorldServer.sh \"${args[@]}\"\nEOF\n\nchmod +x \"${INSTALL_DIR}/pelican-start.sh\"\n\necho \"Installation completed successfully.\"\n",
+            "container": "ghcr.io/ptero-eggs/installers:debian",
+            "entrypoint": "bash"
+        }
+    },
+    "variables": [
+        {
+            "name": "Steam App ID",
+            "description": "Official nanos world Dedicated Server Steam App ID.",
+            "env_variable": "SRCDS_APPID",
+            "default_value": "1936830",
+            "user_viewable": false,
+            "user_editable": false,
+            "rules": "required|integer|in:1936830",
+            "field_type": "text"
+        },
+        {
+            "name": "Release Branch",
+            "description": "Steam branch: public (stable) or bleeding-edge (preview).",
+            "env_variable": "SRCDS_BETAID",
+            "default_value": "public",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|in:public,bleeding-edge",
+            "field_type": "text"
+        },
+        {
+            "name": "Query Port",
+            "description": "UDP query allocation. Must differ from SERVER_PORT.",
+            "env_variable": "QUERY_PORT",
+            "default_value": "7778",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|between:1024,65535",
+            "field_type": "text"
+        },
+        {
+            "name": "Server Name",
+            "description": "Name displayed in the nanos world server list.",
+            "env_variable": "SERVER_NAME",
+            "default_value": "nanos world - Pelican Server",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|max:128",
+            "field_type": "text"
+        },
+        {
+            "name": "Server Description",
+            "description": "Server-list description. nanos world limits it to 200 characters.",
+            "env_variable": "SERVER_DESCRIPTION",
+            "default_value": "A nanos world server hosted with Pelican.",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:200",
+            "field_type": "text"
+        },
+        {
+            "name": "Server Language",
+            "description": "Country/language code used for the server-list flag, e.g. global, fr, us, de.",
+            "env_variable": "SERVER_LANGUAGE",
+            "default_value": "global",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|max:16",
+            "field_type": "text"
+        },
+        {
+            "name": "Server Password",
+            "description": "Optional join password.",
+            "env_variable": "SERVER_PASSWORD",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:128",
+            "field_type": "text"
+        },
+        {
+            "name": "Server Token",
+            "description": "Optional nanos world authorization token for Vault downloads.",
+            "env_variable": "SERVER_TOKEN",
+            "default_value": "",
+            "user_viewable": false,
+            "user_editable": true,
+            "rules": "nullable|string|max:512",
+            "field_type": "text"
+        },
+        {
+            "name": "Steam App",
+            "description": "Players must run the same Steam App as the server.",
+            "env_variable": "STEAM_APP",
+            "default_value": "playtest",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|in:playtest,game",
+            "field_type": "text"
+        },
+        {
+            "name": "Announce Server",
+            "description": "1 publishes the server in the master list; 0 enables direct-connect only.",
+            "env_variable": "ANNOUNCE",
+            "default_value": "1",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|boolean",
+            "field_type": "text"
+        },
+        {
+            "name": "Dedicated Server",
+            "description": "1 uses dedicated networking; 0 uses Steam Datagram Relay/P2P.",
+            "env_variable": "DEDICATED_SERVER",
+            "default_value": "1",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|boolean",
+            "field_type": "text"
+        },
+        {
+            "name": "Map",
+            "description": "Map package loaded at startup.",
+            "env_variable": "SERVER_MAP",
+            "default_value": "default-blank-map",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|max:128",
+            "field_type": "text"
+        },
+        {
+            "name": "Game Mode",
+            "description": "Optional game-mode package.",
+            "env_variable": "GAME_MODE",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:128",
+            "field_type": "text"
+        },
+        {
+            "name": "Packages",
+            "description": "Optional comma-separated package list.",
+            "env_variable": "PACKAGES",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:4096",
+            "field_type": "text"
+        },
+        {
+            "name": "Assets",
+            "description": "Optional comma-separated Asset Pack list.",
+            "env_variable": "ASSETS",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:4096",
+            "field_type": "text"
+        },
+        {
+            "name": "Loading Screen",
+            "description": "Optional loading-screen package.",
+            "env_variable": "LOADING_SCREEN",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:128",
+            "field_type": "text"
+        },
+        {
+            "name": "Server Logo",
+            "description": "Optional HTTP(S) image URL used as server logo.",
+            "env_variable": "SERVER_LOGO",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:1024",
+            "field_type": "text"
+        },
+        {
+            "name": "Maximum Players",
+            "description": "Maximum simultaneous players (1-999).",
+            "env_variable": "MAX_PLAYERS",
+            "default_value": "64",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|between:1,999",
+            "field_type": "text"
+        },
+        {
+            "name": "Auto Download",
+            "description": "Automatically download missing Vault packages/assets.",
+            "env_variable": "AUTO_DOWNLOAD",
+            "default_value": "1",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|boolean",
+            "field_type": "text"
+        },
+        {
+            "name": "Async Logging",
+            "description": "Asynchronous logging. Recommended for production.",
+            "env_variable": "ASYNC_LOG",
+            "default_value": "1",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|boolean",
+            "field_type": "text"
+        },
+        {
+            "name": "Log Level",
+            "description": "1 normal, 2 debug, 3 verbose.",
+            "env_variable": "LOG_LEVEL",
+            "default_value": "1",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|between:1,3",
+            "field_type": "text"
+        },
+        {
+            "name": "Compression",
+            "description": "Network compression: 0 disabled, 1 fastest/default, 9 strongest.",
+            "env_variable": "COMPRESSION",
+            "default_value": "1",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|between:0,9",
+            "field_type": "text"
+        },
+        {
+            "name": "Max Tick Rate",
+            "description": "Server tick rate in Hz. Official default/recommendation: 30.",
+            "env_variable": "MAX_TICK_RATE",
+            "default_value": "30",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|between:15,120",
+            "field_type": "text"
+        },
+        {
+            "name": "Max Sync Rate",
+            "description": "Maximum actor synchronization rate in Hz.",
+            "env_variable": "MAX_SYNC_RATE",
+            "default_value": "30",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|between:1,30",
+            "field_type": "text"
+        },
+        {
+            "name": "Max Send Rate",
+            "description": "Maximum network send rate per client in KB/s. Official default: 1024.",
+            "env_variable": "MAX_SEND_RATE",
+            "default_value": "1024",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|between:128,16384",
+            "field_type": "text"
+        },
+        {
+            "name": "Max File Transfer Rate",
+            "description": "Asset/package transfer rate per client in KB/s; must not exceed Max Send Rate.",
+            "env_variable": "MAX_FILE_TRANSFER_RATE",
+            "default_value": "1024",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|between:128,16384",
+            "field_type": "text"
+        },
+        {
+            "name": "Distance Optimization",
+            "description": "0 disables; 4 is the official balanced default; 9 is most aggressive.",
+            "env_variable": "DISTANCE_OPTIMIZATION",
+            "default_value": "4",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|between:0,9",
+            "field_type": "text"
+        },
+        {
+            "name": "Thread Pool Count",
+            "description": "Async operation worker threads. 0 disables the pool. Default 8 or CPU-core based.",
+            "env_variable": "THREAD_POOL_COUNT",
+            "default_value": "8",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|min:0|max:256",
+            "field_type": "text"
+        },
+        {
+            "name": "Custom Settings",
+            "description": "Optional TOML-style custom settings, e.g. max_props = 1000, enable_pvp = true",
+            "env_variable": "CUSTOM_SETTINGS",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:4096",
+            "field_type": "text"
+        },
+        {
+            "name": "Performance Profiling",
+            "description": "Enable profiling logs for diagnostics.",
+            "env_variable": "PROFILING",
+            "default_value": "0",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|boolean",
+            "field_type": "text"
+        },
+        {
+            "name": "Show Log Thread",
+            "description": "Show current thread in log output.",
+            "env_variable": "LOG_SHOW_THREAD",
+            "default_value": "0",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|boolean",
+            "field_type": "text"
+        },
+        {
+            "name": "Vault Lean Assets",
+            "description": "Download only Asset Pack TOML configuration files from Vault.",
+            "env_variable": "USE_VAULT_ASSETS_LEAN",
+            "default_value": "0",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|boolean",
+            "field_type": "text"
+        },
+        {
+            "name": "Unsafe Lua Libraries",
+            "description": "DANGEROUS: enables unsafe Lua OS/file APIs. Keep disabled unless explicitly required.",
+            "env_variable": "ENABLE_UNSAFE_LIBS",
+            "default_value": "0",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|boolean",
+            "field_type": "text"
+        }
+    ]
+}
