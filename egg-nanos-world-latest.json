@@ -1,13 +1,13 @@
 {
-    "_comment": "Copyright (c) 2026 Yuketsu. MIT License. nanos world a1.156.0 CLI-validated revision.",
+    "_comment": "Copyright (c) 2026 Yuketsu. Licensed under the MIT License.",
     "meta": {
         "version": "PTDL_v2",
         "update_url": null
     },
-    "exported_at": "2026-09-25T15:35:41.683496+00:00",
+    "exported_at": "2026-09-25T15:47:09.540834+00:00",
     "name": "nanos world - Latest",
-    "author": "contact@velyorix.com",
-    "description": "Open-source Pelican egg for nanos world Dedicated Server. CLI arguments validated against nanos world a1.156.0 documentation; SteamCMD public/bleeding-edge install, safe startup wrapper and game/query allocations.",
+    "author": "YuketsuSh@users.noreply.github.com",
+    "description": "Open-source Pelican egg for nanos world Dedicated Server. Direct startup (no generated wrapper), SteamCMD installation, public/bleeding-edge branches, game/query allocations and documented nanos world a1.156.0 CLI settings.",
     "features": [
         "steam_disk_space"
     ],
@@ -16,7 +16,7 @@
         "SteamCMD Ubuntu 24.04": "ghcr.io/ptero-eggs/steamcmd:ubuntu_24.04"
     },
     "file_denylist": [],
-    "startup": "bash ./pelican-start.sh",
+    "startup": "bash -c 'set -e; cd /home/container; test -f ./NanosWorldServer.sh || { echo \"[FATAL] NanosWorldServer.sh missing. Reinstall the server.\"; exit 1; }; chmod +x ./NanosWorldServer.sh; ARGS=(--name \"$SERVER_NAME\" --description \"$SERVER_DESCRIPTION\" --ip 0.0.0.0 --port \"$SERVER_PORT\" --query_port \"$QUERY_PORT\" --announce \"$ANNOUNCE\" --steam_app \"$STEAM_APP\" --map \"$SERVER_MAP\" --max_players \"$MAX_PLAYERS\" --dedicated_server \"$DEDICATED_SERVER\" --async_log \"$ASYNC_LOG\" --log_level \"$LOG_LEVEL\" --compression \"$COMPRESSION\" --max_tick_rate \"$MAX_TICK_RATE\" --max_sync_rate \"$MAX_SYNC_RATE\" --max_send_rate \"$MAX_SEND_RATE\" --max_file_transfer_rate \"$MAX_FILE_TRANSFER_RATE\" --distance_optimization \"$DISTANCE_OPTIMIZATION\" --thread_pool_count \"$THREAD_POOL_COUNT\"); [[ -n \"$SERVER_PASSWORD\" ]] && ARGS+=(--password \"$SERVER_PASSWORD\"); [[ -n \"$SERVER_TOKEN\" ]] && ARGS+=(--token \"$SERVER_TOKEN\"); [[ -n \"$GAME_MODE\" ]] && ARGS+=(--game_mode \"$GAME_MODE\"); [[ -n \"$PACKAGES\" ]] && ARGS+=(--packages \"$PACKAGES\"); [[ -n \"$ASSETS\" ]] && ARGS+=(--assets \"$ASSETS\"); [[ -n \"$LOADING_SCREEN\" ]] && ARGS+=(--loading_screen \"$LOADING_SCREEN\"); [[ -n \"$SERVER_LOGO\" ]] && ARGS+=(--logo \"$SERVER_LOGO\"); [[ -n \"$CUSTOM_SETTINGS\" ]] && ARGS+=(--custom_settings \"$CUSTOM_SETTINGS\"); [[ \"$AUTO_DOWNLOAD\" == \"1\" ]] && ARGS+=(--auto_download); [[ \"$PROFILING\" == \"1\" ]] && ARGS+=(--profiling); [[ \"$LOG_SHOW_THREAD\" == \"1\" ]] && ARGS+=(--log_show_thread); [[ \"$USE_VAULT_ASSETS_LEAN\" == \"1\" ]] && ARGS+=(--use_vault_assets_lean); [[ \"$ENABLE_UNSAFE_LIBS\" == \"1\" ]] && ARGS+=(--enable_unsafe_libs); echo \"Starting nanos world on ${SERVER_PORT} TCP/UDP; query ${QUERY_PORT} UDP\"; exec ./NanosWorldServer.sh \"${ARGS[@]}\"'",
     "config": {
         "files": "{}",
         "startup": "{\n    \"done\": \"Server started\"\n}",
@@ -25,7 +25,7 @@
     },
     "scripts": {
         "installation": {
-            "script": "#!/bin/bash\nset -euo pipefail\n\nAPP_ID=\"${SRCDS_APPID:-1936830}\"\nBRANCH=\"${SRCDS_BETAID:-public}\"\nINSTALL_DIR=\"/mnt/server\"\nSTEAMCMD_DIR=\"${INSTALL_DIR}/steamcmd\"\n\necho \"==================================================\"\necho \" nanos world Dedicated Server - Pelican\"\necho \" Maintainer: Yuketsu (YuketsuSh)\"\necho \" Steam App ID: ${APP_ID}\"\necho \" Branch: ${BRANCH}\"\necho \"==================================================\"\n\nmkdir -p \"${INSTALL_DIR}\" \"${STEAMCMD_DIR}\"\ncd /tmp\n\necho \"[1/4] Downloading SteamCMD...\"\ncurl -fsSL \\\n  \"https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz\" \\\n  -o steamcmd_linux.tar.gz\ntar -xzf steamcmd_linux.tar.gz -C \"${STEAMCMD_DIR}\"\n\nexport HOME=\"${INSTALL_DIR}\"\ncd \"${STEAMCMD_DIR}\"\n\necho \"[2/4] Installing/updating nanos world...\"\n./steamcmd.sh \\\n    +force_install_dir \"${INSTALL_DIR}\" \\\n    +login anonymous \\\n    +app_update \"${APP_ID}\" -beta \"${BRANCH}\" validate \\\n    +quit\n\necho \"[3/4] Preparing Steam runtime...\"\nmkdir -p \"${INSTALL_DIR}/.steam/sdk32\" \"${INSTALL_DIR}/.steam/sdk64\"\n\nif [[ -f \"${STEAMCMD_DIR}/linux32/steamclient.so\" ]]; then\n    cp -f \"${STEAMCMD_DIR}/linux32/steamclient.so\" \\\n        \"${INSTALL_DIR}/.steam/sdk32/steamclient.so\"\nfi\n\nif [[ -f \"${STEAMCMD_DIR}/linux64/steamclient.so\" ]]; then\n    cp -f \"${STEAMCMD_DIR}/linux64/steamclient.so\" \\\n        \"${INSTALL_DIR}/.steam/sdk64/steamclient.so\"\nfi\n\nchmod +x \"${INSTALL_DIR}/NanosWorldServer.sh\" 2>/dev/null || true\nchmod +x \"${INSTALL_DIR}/NanosWorldServer\" 2>/dev/null || true\nchmod +x \"${INSTALL_DIR}/NanosWorldServerTracy\" 2>/dev/null || true\n\necho \"[4/4] Writing Pelican startup wrapper...\"\n\ncat > \"${INSTALL_DIR}/pelican-start.sh\" <<'EOF'\n#!/bin/bash\nset -euo pipefail\n\ncd /home/container\n\nif [[ ! -f \"./NanosWorldServer.sh\" ]]; then\n    echo \"[FATAL] ./NanosWorldServer.sh was not found.\"\n    echo \"[FATAL] Reinstall the server from Pelican.\"\n    exit 1\nfi\n\nchmod +x ./NanosWorldServer.sh 2>/dev/null || true\n\nif [[ \"${QUERY_PORT}\" == \"${SERVER_PORT}\" ]]; then\n    echo \"[FATAL] QUERY_PORT (${QUERY_PORT}) must differ from SERVER_PORT (${SERVER_PORT}).\"\n    exit 1\nfi\n\nif (( MAX_FILE_TRANSFER_RATE > MAX_SEND_RATE )); then\n    echo \"[WARN] MAX_FILE_TRANSFER_RATE is greater than MAX_SEND_RATE.\"\n    echo \"[WARN] nanos world will clamp it; using MAX_SEND_RATE=${MAX_SEND_RATE} instead.\"\n    MAX_FILE_TRANSFER_RATE=\"${MAX_SEND_RATE}\"\nfi\n\nargs=(\n    --name \"${SERVER_NAME}\"\n    --description \"${SERVER_DESCRIPTION}\"\n    --ip \"0.0.0.0\"\n    --port \"${SERVER_PORT}\"\n    --query_port \"${QUERY_PORT}\"\n    --announce \"${ANNOUNCE}\"\n    --dedicated_server \"${DEDICATED_SERVER}\"\n    --steam_app \"${STEAM_APP}\"\n    --map \"${SERVER_MAP}\"\n    --max_players \"${MAX_PLAYERS}\"\n    --async_log \"${ASYNC_LOG}\"\n    --log_level \"${LOG_LEVEL}\"\n    --compression \"${COMPRESSION}\"\n    --max_tick_rate \"${MAX_TICK_RATE}\"\n    --max_sync_rate \"${MAX_SYNC_RATE}\"\n    --max_send_rate \"${MAX_SEND_RATE}\"\n    --max_file_transfer_rate \"${MAX_FILE_TRANSFER_RATE}\"\n    --distance_optimization \"${DISTANCE_OPTIMIZATION}\"\n    --thread_pool_count \"${THREAD_POOL_COUNT}\"\n)\n\n[[ -n \"${SERVER_PASSWORD:-}\" ]] && args+=(--password \"${SERVER_PASSWORD}\")\n[[ -n \"${SERVER_TOKEN:-}\" ]] && args+=(--token \"${SERVER_TOKEN}\")\n[[ -n \"${GAME_MODE:-}\" ]] && args+=(--game_mode \"${GAME_MODE}\")\n[[ -n \"${PACKAGES:-}\" ]] && args+=(--packages \"${PACKAGES}\")\n[[ -n \"${ASSETS:-}\" ]] && args+=(--assets \"${ASSETS}\")\n[[ -n \"${LOADING_SCREEN:-}\" ]] && args+=(--loading_screen \"${LOADING_SCREEN}\")\n[[ -n \"${SERVER_LOGO:-}\" ]] && args+=(--logo \"${SERVER_LOGO}\")\n[[ -n \"${CUSTOM_SETTINGS:-}\" ]] && args+=(--custom_settings \"${CUSTOM_SETTINGS}\")\n\n[[ \"${AUTO_DOWNLOAD:-1}\" == \"1\" ]] && args+=(--auto_download)\n[[ \"${PROFILING:-0}\" == \"1\" ]] && args+=(--profiling)\n[[ \"${LOG_SHOW_THREAD:-0}\" == \"1\" ]] && args+=(--log_show_thread)\n[[ \"${USE_VAULT_ASSETS_LEAN:-0}\" == \"1\" ]] && args+=(--use_vault_assets_lean)\n[[ \"${ENABLE_UNSAFE_LIBS:-0}\" == \"1\" ]] && args+=(--enable_unsafe_libs)\n\necho \"==================================================\"\necho \" nanos world Dedicated Server\"\necho \" Maintained by Yuketsu / YuketsuSh\"\necho \" Game/HTTP : 0.0.0.0:${SERVER_PORT} TCP + UDP\"\necho \" Query     : 0.0.0.0:${QUERY_PORT} UDP\"\necho \" Steam App : ${STEAM_APP}\"\necho \" Map       : ${SERVER_MAP}\"\necho \" Players   : ${MAX_PLAYERS}\"\necho \"==================================================\"\n\nexec ./NanosWorldServer.sh \"${args[@]}\"\nEOF\n\nchmod +x \"${INSTALL_DIR}/pelican-start.sh\"\n\necho \"Installation completed successfully.\"\n",
+            "script": "#!/bin/bash\nset -euo pipefail\n\nAPP_ID=\"${SRCDS_APPID:-1936830}\"\nBRANCH=\"${SRCDS_BETAID:-public}\"\nINSTALL_DIR=\"/mnt/server\"\nSTEAMCMD_DIR=\"${INSTALL_DIR}/steamcmd\"\n\nmkdir -p \"${INSTALL_DIR}\" \"${STEAMCMD_DIR}\"\ncd /tmp\n\necho \"[1/3] Installing SteamCMD...\"\ncurl -fsSL \"https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz\" -o steamcmd.tar.gz\ntar -xzf steamcmd.tar.gz -C \"${STEAMCMD_DIR}\"\n\nexport HOME=\"${INSTALL_DIR}\"\n\necho \"[2/3] Installing/verifying nanos world Dedicated Server...\"\ncd \"${STEAMCMD_DIR}\"\nif [[ \"${BRANCH}\" == \"public\" ]]; then\n    ./steamcmd.sh +force_install_dir \"${INSTALL_DIR}\" +login anonymous +app_update \"${APP_ID}\" validate +quit\nelse\n    ./steamcmd.sh +force_install_dir \"${INSTALL_DIR}\" +login anonymous +app_update \"${APP_ID}\" -beta \"${BRANCH}\" validate +quit\nfi\n\necho \"[3/3] Preparing runtime...\"\nmkdir -p \"${INSTALL_DIR}/.steam/sdk32\" \"${INSTALL_DIR}/.steam/sdk64\"\n[[ -f \"${STEAMCMD_DIR}/linux32/steamclient.so\" ]] && cp -f \"${STEAMCMD_DIR}/linux32/steamclient.so\" \"${INSTALL_DIR}/.steam/sdk32/steamclient.so\"\n[[ -f \"${STEAMCMD_DIR}/linux64/steamclient.so\" ]] && cp -f \"${STEAMCMD_DIR}/linux64/steamclient.so\" \"${INSTALL_DIR}/.steam/sdk64/steamclient.so\"\n\nif [[ ! -f \"${INSTALL_DIR}/NanosWorldServer.sh\" ]]; then\n    echo \"[FATAL] SteamCMD completed but NanosWorldServer.sh was not installed.\"\n    find \"${INSTALL_DIR}\" -maxdepth 2 -type f | sort | head -100\n    exit 1\nfi\n\nchmod +x \"${INSTALL_DIR}/NanosWorldServer.sh\"\n[[ -f \"${INSTALL_DIR}/NanosWorldServer\" ]] && chmod +x \"${INSTALL_DIR}/NanosWorldServer\"\n[[ -f \"${INSTALL_DIR}/NanosWorldServerTracy\" ]] && chmod +x \"${INSTALL_DIR}/NanosWorldServerTracy\"\n\necho \"Installation complete: ${INSTALL_DIR}/NanosWorldServer.sh is present.\"\nexit 0\n",
             "container": "ghcr.io/ptero-eggs/installers:debian",
             "entrypoint": "bash"
         }
@@ -43,7 +43,7 @@
         },
         {
             "name": "Release Branch",
-            "description": "Steam branch: public (stable) or bleeding-edge (preview).",
+            "description": "Steam branch to install: public or bleeding-edge.",
             "env_variable": "SRCDS_BETAID",
             "default_value": "public",
             "user_viewable": true,
@@ -53,7 +53,7 @@
         },
         {
             "name": "Query Port",
-            "description": "UDP query allocation. Must differ from SERVER_PORT.",
+            "description": "UDP query allocation. Must differ from the primary SERVER_PORT.",
             "env_variable": "QUERY_PORT",
             "default_value": "7778",
             "user_viewable": true,
@@ -73,7 +73,7 @@
         },
         {
             "name": "Server Description",
-            "description": "Server-list description. nanos world limits it to 200 characters.",
+            "description": "Description displayed in the server list (max 200 characters).",
             "env_variable": "SERVER_DESCRIPTION",
             "default_value": "A nanos world server hosted with Pelican.",
             "user_viewable": true,
@@ -93,7 +93,7 @@
         },
         {
             "name": "Server Token",
-            "description": "Optional nanos world authorization token for Vault downloads.",
+            "description": "Optional authorization token for Vault downloads.",
             "env_variable": "SERVER_TOKEN",
             "default_value": "",
             "user_viewable": false,
@@ -103,7 +103,7 @@
         },
         {
             "name": "Steam App",
-            "description": "Players must run the same Steam App as the server.",
+            "description": "Players must use the same nanos world Steam App.",
             "env_variable": "STEAM_APP",
             "default_value": "playtest",
             "user_viewable": true,
@@ -113,7 +113,7 @@
         },
         {
             "name": "Announce Server",
-            "description": "1 publishes the server in the master list; 0 enables direct-connect only.",
+            "description": "1 announces the server; 0 keeps it direct-connect only.",
             "env_variable": "ANNOUNCE",
             "default_value": "1",
             "user_viewable": true,
@@ -123,7 +123,7 @@
         },
         {
             "name": "Dedicated Server",
-            "description": "1 uses dedicated networking; 0 uses Steam Datagram Relay/P2P.",
+            "description": "1 dedicated networking; 0 Steam Datagram Relay/P2P.",
             "env_variable": "DEDICATED_SERVER",
             "default_value": "1",
             "user_viewable": true,
@@ -183,7 +183,7 @@
         },
         {
             "name": "Server Logo",
-            "description": "Optional HTTP(S) image URL used as server logo.",
+            "description": "Optional HTTP(S) JPG image URL.",
             "env_variable": "SERVER_LOGO",
             "default_value": "",
             "user_viewable": true,
@@ -213,7 +213,7 @@
         },
         {
             "name": "Async Logging",
-            "description": "Asynchronous logging. Recommended for production.",
+            "description": "1 enables asynchronous logging.",
             "env_variable": "ASYNC_LOG",
             "default_value": "1",
             "user_viewable": true,
@@ -233,7 +233,7 @@
         },
         {
             "name": "Compression",
-            "description": "Network compression: 0 disabled, 1 fastest/default, 9 strongest.",
+            "description": "Network compression level 0-9; upstream default is 1.",
             "env_variable": "COMPRESSION",
             "default_value": "1",
             "user_viewable": true,
@@ -243,7 +243,7 @@
         },
         {
             "name": "Max Tick Rate",
-            "description": "Server tick rate in Hz. Official default/recommendation: 30.",
+            "description": "Server tick rate in Hz (15-120). Upstream recommends 30.",
             "env_variable": "MAX_TICK_RATE",
             "default_value": "30",
             "user_viewable": true,
@@ -253,7 +253,7 @@
         },
         {
             "name": "Max Sync Rate",
-            "description": "Maximum actor synchronization rate in Hz.",
+            "description": "Actor synchronization rate in Hz (1-30).",
             "env_variable": "MAX_SYNC_RATE",
             "default_value": "30",
             "user_viewable": true,
@@ -263,7 +263,7 @@
         },
         {
             "name": "Max Send Rate",
-            "description": "Maximum network send rate per client in KB/s. Official default: 1024.",
+            "description": "Maximum send rate per client in KB/s (128-16384).",
             "env_variable": "MAX_SEND_RATE",
             "default_value": "1024",
             "user_viewable": true,
@@ -273,7 +273,7 @@
         },
         {
             "name": "Max File Transfer Rate",
-            "description": "Asset/package transfer rate per client in KB/s; must not exceed Max Send Rate.",
+            "description": "Maximum package/asset transfer rate per client in KB/s. Keep <= Max Send Rate.",
             "env_variable": "MAX_FILE_TRANSFER_RATE",
             "default_value": "1024",
             "user_viewable": true,
@@ -283,7 +283,7 @@
         },
         {
             "name": "Distance Optimization",
-            "description": "0 disables; 4 is the official balanced default; 9 is most aggressive.",
+            "description": "0 disabled, 4 balanced/default, 9 most aggressive.",
             "env_variable": "DISTANCE_OPTIMIZATION",
             "default_value": "4",
             "user_viewable": true,
@@ -293,7 +293,7 @@
         },
         {
             "name": "Thread Pool Count",
-            "description": "Async operation worker threads. 0 disables the pool. Default 8 or CPU-core based.",
+            "description": "Threads for async operations; 0 disables the pool.",
             "env_variable": "THREAD_POOL_COUNT",
             "default_value": "8",
             "user_viewable": true,
@@ -303,7 +303,7 @@
         },
         {
             "name": "Custom Settings",
-            "description": "Optional TOML-style custom settings, e.g. max_props = 1000, enable_pvp = true",
+            "description": "Optional TOML-style custom settings.",
             "env_variable": "CUSTOM_SETTINGS",
             "default_value": "",
             "user_viewable": true,
@@ -313,7 +313,7 @@
         },
         {
             "name": "Performance Profiling",
-            "description": "Enable profiling logs for diagnostics.",
+            "description": "Enable profiling logs.",
             "env_variable": "PROFILING",
             "default_value": "0",
             "user_viewable": true,
@@ -333,7 +333,7 @@
         },
         {
             "name": "Vault Lean Assets",
-            "description": "Download only Asset Pack TOML configuration files from Vault.",
+            "description": "Only download Asset Pack TOML configs from Vault.",
             "env_variable": "USE_VAULT_ASSETS_LEAN",
             "default_value": "0",
             "user_viewable": true,
@@ -343,7 +343,7 @@
         },
         {
             "name": "Unsafe Lua Libraries",
-            "description": "DANGEROUS: enables unsafe Lua OS/file APIs. Keep disabled unless explicitly required.",
+            "description": "DANGEROUS: enables unsafe Lua OS/file APIs.",
             "env_variable": "ENABLE_UNSAFE_LIBS",
             "default_value": "0",
             "user_viewable": true,
